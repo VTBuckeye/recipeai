@@ -1,0 +1,226 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: recipeai-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-recipeai_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-recipeai_password}
+      MONGO_INITDB_DATABASE: recipeai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: recipeai-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Client - Create buckets
+  minio-client:
+    image: minio/mc:latest
+    container_name: recipeai-minio-client
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add minio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb minio/recipeai-images --ignore-existing;
+      /usr/bin/mc anonymous set download minio/recipeai-images;
+      exit 0;
+      "
+    networks:
+      - recipeai-network
+
+  # SuperTokens Core
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:10.0
+    container_name: recipeai-supertokens
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_CONNECTION_URI: postgresql://supertokens_user:supertokens_password@postgres:5432/supertokens
+      API_KEYS: ${SUPERTOKENS_API_KEY:-}
+    ports:
+      - "3567:3567"
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3567/hello"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for SuperTokens
+  postgres:
+    image: postgres:16-alpine
+    container_name: recipeai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: supertokens_user
+      POSTGRES_PASSWORD: supertokens_password
+      POSTGRES_DB: supertokens
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supertokens_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Loki - Log aggregation
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: recipeai-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: recipeai-grafana
+    restart: unless-stopped
+    depends_on:
+      - loki
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: recipeai-server
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      supertokens:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGODB_URI: mongodb://recipeai_user:recipeai_password@mongodb:27017/recipeai?authSource=admin
+      SUPERTOKENS_CONNECTION_URI: http://supertokens:3567
+      SUPERTOKENS_API_KEY: ${SUPERTOKENS_API_KEY}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_USE_SSL: false
+      MINIO_BUCKET_NAME: recipeai-images
+      LOKI_HOST: loki
+      LOKI_PORT: 3100
+      LOG_LEVEL: info
+      CORS_ORIGIN: http://localhost:3000
+      MAX_FILE_SIZE: 1048576
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server/src:/app/src
+      - /app/node_modules
+    networks:
+      - recipeai-network
+
+  # Frontend Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: recipeai-client
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+      REACT_APP_SUPERTOKENS_API_DOMAIN: http://localhost:5000
+      REACT_APP_SUPERTOKENS_API_BASE_PATH: /auth
+      REACT_APP_SUPERTOKENS_WEBSITE_DOMAIN: http://localhost:3000
+      REACT_APP_LOKI_HOST: http://localhost:3100
+      REACT_APP_LOG_LEVEL: info
+      WATCHPACK_POLLING: true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+      - /app/node_modules
+    networks:
+      - recipeai-network
+    stdin_open: true
+    tty: true
+
+networks:
+  recipeai-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  postgres_data:
+  minio_data:
+  loki_data:
+  grafana_data:

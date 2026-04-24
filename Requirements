@@ -1,0 +1,93 @@
+Implement a react application that allows users to create, modify, delete recipes.
+The user should have a profile that includes a picture they can upload, their email address, and their name.
+Recipes should be tied to a user.
+There should be an option for a recipe to be public or private.
+Users should be able to browser their recipes.
+User authentication should be passwordless and be handled by SuperTokens.
+The authentication should be a custom client for supertokens.
+For binary data and images, use MinIO.
+Make sure that all actions are confirmed that a user is logged in.
+Use a MERN stack for the solution
+The client actions should be separated from the server actions via an express api middleware.
+All server application actions should be logged to loki/grafana.
+All client application actions should be logged to loki/grafana with the sessions uniquely identified by the user's email address.
+The server application should be written in typescript, whereever possible.  Only exclude typescript when it is not possible.
+The website should utilize MaterialUI for the UI for the client.
+The solution should utililze Docker images for all of the services identified in the requirements.
+The solution should utilize Docker Compose for the orchestration of the services.
+While we are not utilizing kubernetes immediately, the solution should not do anything that would prevent it from being used in the future.
+The website should follow the best practices for web development.
+The website should have have a home page that describes the website, using images and text.
+The website should have a top navigation bar.
+The website should have a footer.
+The website should be viewable on mobile and desktop devices in a form factor that is comfortable for the device in use.
+
+## Additional Requirements (Clarifications):
+
+### Recipe Schema:
+- Title (required)
+- Description (required)
+- Ingredients: array of objects with quantity, unit, and name
+- Instructions: sequential array where each step may optionally have an associated image
+- Tags: array of strings for categorization
+- Images: recipes support multiple images (stored in MinIO)
+- Created/modified timestamps
+- Public/private flag
+- Owner user reference
+
+### Search and Filter:
+- Users can search recipes by title, description, ingredients, and tags
+- Filtering should be granular and allow searching on specific recipe elements
+
+### Authentication:
+- Passwordless authentication using OTP (One-Time Password)
+- Custom SuperTokens UI (not the default interface)
+- Email-based OTP delivery
+
+### Logging:
+- Configurable logging levels (default: info level)
+- Log both successful and unsuccessful actions
+- Include sufficient data for problem reproduction
+- Client logs identified by user email
+- Server logs for all API actions
+
+### MinIO Configuration:
+- Store profile pictures, recipe images, and all website image content
+- File upload limit: 1MB (configurable)
+- Support for multiple image formats
+
+### Environment Configuration:
+- Separate docker-compose files for development and production
+- Infrastructure supports multiple environments
+- Initial implementation: development environment only
+- Environment-specific configuration files
+
+### Content:
+- Home page with placeholder content and images
+- Print-friendly recipe view
+- No import/export functionality in initial version
+
+### Recipe Browsing & Discovery:
+- Users can browse OTHER users' public recipes via "Explore Recipes" page
+- "My Recipes" page shows only user's own recipes (public and private)
+- Public recipes have shareable URLs
+- Search requires authentication
+
+### Recipe Images:
+- Multiple images can be uploaded per recipe
+- First image serves as cover/primary image
+- Each instruction step may optionally have an associated image
+
+### Tags & Units:
+- Tags: Free-form text entry with autocomplete suggestions from existing tags in database
+- Measurement Units: Predefined list (cup, tbsp, tsp, oz, lb, g, kg, ml, l, piece, to taste) with "other" option for free text
+
+### Authentication UI Requirements:
+- Custom Material-UI authentication pages (no pre-built SuperTokens UI)
+- Registration/Login flow using OTP via email
+- Email prefix used as default user name (editable in profile later)
+- SuperTokens handles email delivery
+- Post-login redirect to Dashboard page
+- First-time user welcome modal with site overview (content TBD)
+- Error handling via Material-UI Snackbar notifications
+- Loading states during OTP verification

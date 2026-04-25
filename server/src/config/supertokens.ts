@@ -100,7 +100,14 @@ export const initSuperTokens = (): void => {
           },
         },
       }),
-      Session.init(),
+      Session.init({
+        // Session expires after 30 minutes of inactivity
+        sessionExpiredStatusCode: 401,
+        cookieSameSite: 'lax',
+        cookieSecure: config.NODE_ENV === 'production',
+        // Anti-CSRF protection
+        antiCsrf: 'VIA_TOKEN',
+      }),
       Dashboard.init({
         apiKey: config.SUPERTOKENS_API_KEY,
       }),

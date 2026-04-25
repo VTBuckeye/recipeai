@@ -73,6 +73,9 @@ services:
     environment:
       POSTGRESQL_CONNECTION_URI: postgresql://supertokens_user:supertokens_password@postgres:5432/supertokens
       API_KEYS: ${SUPERTOKENS_API_KEY:-}
+      # Session timeout configuration (milliseconds)
+      ACCESS_TOKEN_VALIDITY: 1800000  # 30 minutes
+      REFRESH_TOKEN_VALIDITY: 604800000  # 7 days
     ports:
       - "3567:3567"
     networks:
@@ -169,6 +172,7 @@ services:
       SUPERTOKENS_API_KEY: ${SUPERTOKENS_API_KEY}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
+      MINIO_PUBLIC_ENDPOINT: localhost  # Browser-accessible endpoint
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_USE_SSL: false

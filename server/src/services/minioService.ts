@@ -98,7 +98,9 @@ class MinioService {
     try {
       const protocol = config.MINIO_USE_SSL ? 'https' : 'http';
       const port = config.MINIO_PORT === 80 || config.MINIO_PORT === 443 ? '' : `:${config.MINIO_PORT}`;
-      return `${protocol}://${config.MINIO_ENDPOINT}${port}/${this.bucketName}/${filename}`;
+      // Use public endpoint for browser-accessible URLs
+      const endpoint = config.MINIO_PUBLIC_ENDPOINT || config.MINIO_ENDPOINT;
+      return `${protocol}://${endpoint}${port}/${this.bucketName}/${filename}`;
     } catch (error) {
       logger.error('Error getting file URL:', {
         error: error instanceof Error ? error.message : 'Unknown error',

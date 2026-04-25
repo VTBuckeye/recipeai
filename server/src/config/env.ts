@@ -20,6 +20,7 @@ interface EnvConfig {
   // MinIO
   MINIO_ENDPOINT: string;
   MINIO_PORT: number;
+  MINIO_PUBLIC_ENDPOINT: string;  // Browser-accessible endpoint
   MINIO_ACCESS_KEY: string;
   MINIO_SECRET_KEY: string;
   MINIO_USE_SSL: boolean;
@@ -76,6 +77,7 @@ export const config: EnvConfig = {
 
   MINIO_ENDPOINT: getEnvVar('MINIO_ENDPOINT'),
   MINIO_PORT: getEnvNumber('MINIO_PORT', 9000),
+  MINIO_PUBLIC_ENDPOINT: getEnvVar('MINIO_PUBLIC_ENDPOINT', getEnvVar('MINIO_ENDPOINT')),
   MINIO_ACCESS_KEY: getEnvVar('MINIO_ACCESS_KEY'),
   MINIO_SECRET_KEY: getEnvVar('MINIO_SECRET_KEY'),
   MINIO_USE_SSL: getEnvBoolean('MINIO_USE_SSL', false),

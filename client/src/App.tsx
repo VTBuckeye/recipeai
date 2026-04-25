@@ -17,6 +17,7 @@ import { Profile } from './pages/Profile';
 import { MyRecipes } from './pages/MyRecipes';
 import { ExploreRecipes } from './pages/ExploreRecipes';
 import { RecipeDetailPage } from './pages/RecipeDetailPage';
+import { SessionTimeoutWarning } from './components/SessionTimeoutWarning';
 import logger from './utils/logger';
 
 // Initialize SuperTokens
@@ -35,6 +36,7 @@ const App: React.FC = () => {
         <CssBaseline />
         <SnackbarProvider>
           <Router>
+            <SessionTimeoutWarning />
             <Layout>
               <Routes>
                 {/* Public Routes */}

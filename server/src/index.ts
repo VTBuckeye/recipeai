@@ -10,12 +10,14 @@ import { config } from './config/env';
 import { connectDatabase } from './config/database';
 import { initSuperTokens } from './config/supertokens';
 import routes from './routes';
+import metricsRoutes from './routes/metricsRoutes';
 import {
   requestLogger,
   errorLogger,
   sessionLogger,
   errorHandler,
   notFoundHandler,
+  metricsMiddleware,
 } from './middleware';
 import logger from './utils/logger';
 
@@ -49,9 +51,15 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Metrics middleware (before logging to track all requests)
+app.use(metricsMiddleware);
+
 // Logging middleware
 app.use(requestLogger);
 app.use(sessionLogger);
+
+// Metrics endpoint (before rate limiting and auth)
+app.use('/metrics', metricsRoutes);
 
 // SuperTokens middleware
 app.use(supertokensMiddleware());
@@ -76,6 +84,18 @@ const startServer = async (): Promise<void> => {
   try {
     // Connect to MongoDB
     await connectDatabase();
+
+    // Initialize content moderation model
+    try {
+      const { initializeModel } = await import('./services/contentModerationService');
+      await initializeModel();
+      logger.info('Content moderation model initialized');
+    } catch (error) {
+      logger.error('Failed to initialize content moderation model', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      logger.warn('Content moderation will be disabled');
+    }
 
     // Start listening
     const server = app.listen(config.PORT, () => {

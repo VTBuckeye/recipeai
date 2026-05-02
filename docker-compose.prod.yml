@@ -112,6 +112,44 @@ services:
       timeout: 5s
       retries: 5
 
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    container_name: recipeai-prometheus-prod
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - recipeai-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Promtail - Log shipping
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: recipeai-promtail-prod
+    restart: always
+    depends_on:
+      - loki
+    volumes:
+      - ./docker/promtail/promtail-config.yaml:/etc/promtail/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - recipeai-network
+
   # Grafana - Visualization
   grafana:
     image: grafana/grafana:10.2.3
@@ -209,4 +247,5 @@ volumes:
   postgres_data:
   minio_data:
   loki_data:
+  prometheus_data:
   grafana_data:

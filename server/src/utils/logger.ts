@@ -38,24 +38,31 @@ if (config.NODE_ENV === 'development') {
 }
 
 // Loki transport for log aggregation
-try {
-  logger.add(
-    new LokiTransport({
+if (config.LOKI_HOST && config.LOKI_PORT) {
+  try {
+    const lokiTransport = new LokiTransport({
       host: `http://${config.LOKI_HOST}:${config.LOKI_PORT}`,
       labels: {
         app: 'recipeai-server',
         environment: config.NODE_ENV,
       },
       json: true,
-      format: json(),
+      batching: true,
+      interval: 5, // Send logs every 5 seconds
       replaceTimestamp: true,
+      gracefulShutdown: false,
+      timeout: 30000,
       onConnectionError: (err) => {
         console.error('Loki connection error:', err);
       },
-    })
-  );
-} catch (error) {
-  console.error('Failed to initialize Loki transport:', error);
+    });
+    logger.add(lokiTransport);
+    console.log(`Loki transport initialized: http://${config.LOKI_HOST}:${config.LOKI_PORT}`);
+  } catch (error) {
+    console.error('Failed to initialize Loki transport:', error);
+  }
+} else {
+  console.warn('Loki configuration missing - logs will not be sent to Loki');
 }
 
 // Production console transport

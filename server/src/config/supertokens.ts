@@ -64,6 +64,29 @@ export const initSuperTokens = (): void => {
                 // Call original implementation
                 const response = await originalImplementation.consumeCodePOST!(input);
 
+                // Always log the login attempt outcome so the start of a session is
+                // identifiable in Loki regardless of success/failure.
+                if (response.status === 'OK') {
+                  const userEmail =
+                    response.user.emails && response.user.emails.length > 0
+                      ? response.user.emails[0]
+                      : undefined;
+                  logger.info('Login attempt', {
+                    event: 'session_start',
+                    status: 'OK',
+                    sessionHandle: response.session.getHandle(),
+                    userId: response.user.id,
+                    email: userEmail,
+                    createdNewUser: response.createdNewRecipeUser,
+                  });
+                } else {
+                  logger.info('Login attempt', {
+                    event: 'session_start',
+                    status: response.status,
+                    sessionHandle: null,
+                  });
+                }
+
                 // If sign up/in was successful, create user in MongoDB
                 if (response.status === 'OK') {
                   const { user, createdNewRecipeUser } = response;

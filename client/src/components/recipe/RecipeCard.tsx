@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -8,11 +8,13 @@ import {
   Chip,
   Box,
   IconButton,
-  Tooltip
+  Tooltip,
+  Button
 } from '@mui/material';
-import { Edit, Delete, Visibility, Lock, Public } from '@mui/icons-material';
+import { Edit, Delete, Visibility, Lock, Public, CalendarMonth } from '@mui/icons-material';
 import { Recipe } from '../../types';
 import { useNavigate } from 'react-router-dom';
+import AddToMealPlanModal from '../mealPlan/AddToMealPlanModal';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -28,6 +30,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   showActions = false
 }) => {
   const navigate = useNavigate();
+  const [mealPlanModalOpen, setMealPlanModalOpen] = useState(false);
 
   const handleView = () => {
     navigate(`/recipes/${recipe._id}`);
@@ -41,6 +44,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onDelete) onDelete(recipe);
+  };
+
+  const handleAddToMealPlan = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMealPlanModalOpen(true);
   };
 
   const coverImage = recipe.images && recipe.images.length > 0
@@ -123,25 +131,44 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         </Typography>
       </CardContent>
 
-      {showActions && (
-        <CardActions sx={{ justifyContent: 'flex-end', pt: 0 }}>
-          <Tooltip title="View">
-            <IconButton size="small" onClick={handleView}>
-              <Visibility />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Edit">
-            <IconButton size="small" onClick={handleEdit} color="primary">
-              <Edit />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete">
-            <IconButton size="small" onClick={handleDelete} color="error">
-              <Delete />
-            </IconButton>
-          </Tooltip>
-        </CardActions>
-      )}
+      <CardActions sx={{ justifyContent: 'space-between', pt: 0, px: 2, pb: 2 }}>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<CalendarMonth />}
+          onClick={handleAddToMealPlan}
+        >
+          Add to Plan
+        </Button>
+
+        {showActions && (
+          <Box>
+            <Tooltip title="View">
+              <IconButton size="small" onClick={handleView}>
+                <Visibility />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Edit">
+              <IconButton size="small" onClick={handleEdit} color="primary">
+                <Edit />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" onClick={handleDelete} color="error">
+                <Delete />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
+      </CardActions>
+
+      {/* Add to Meal Plan Modal */}
+      <AddToMealPlanModal
+        open={mealPlanModalOpen}
+        onClose={() => setMealPlanModalOpen(false)}
+        recipeId={recipe._id}
+        recipeTitle={recipe.title}
+      />
     </Card>
   );
 };

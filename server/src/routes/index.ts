@@ -2,6 +2,8 @@ import { Router } from 'express';
 import userRoutes from './userRoutes';
 import recipeRoutes from './recipeRoutes';
 import webVitalsRoutes from './webVitalsRoutes';
+import familyMemberRoutes from './familyMemberRoutes';
+import mealPlanRoutes from './mealPlanRoutes';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.get('/health', (_req, res) => {
 router.use('/users', userRoutes);
 router.use('/recipes', recipeRoutes);
 router.use('/metrics/web-vitals', webVitalsRoutes);
+router.use('/family-members', familyMemberRoutes);
+router.use('/meal-plans', mealPlanRoutes);
 
 export default router;

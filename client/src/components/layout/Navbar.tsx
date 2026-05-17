@@ -22,6 +22,7 @@ import {
   Dashboard as DashboardIcon,
   LibraryBooks as LibraryBooksIcon,
   Explore as ExploreIcon,
+  CalendarMonth as CalendarMonthIcon,
 } from '@mui/icons-material';
 import { useSessionContext } from 'supertokens-auth-react/recipe/session';
 import { signOut } from 'supertokens-auth-react/recipe/passwordless';
@@ -107,6 +108,9 @@ const Navbar: React.FC = () => {
                     <MenuItem onClick={() => { navigate('/explore'); handleCloseNavMenu(); }}>
                       <ExploreIcon sx={{ mr: 1 }} /> Explore
                     </MenuItem>
+                    <MenuItem onClick={() => { navigate('/meal-plan'); handleCloseNavMenu(); }}>
+                      <CalendarMonthIcon sx={{ mr: 1 }} /> Meal Plan
+                    </MenuItem>
                   </>
                 )}
               </Menu>
@@ -144,6 +148,9 @@ const Navbar: React.FC = () => {
                 </Button>
                 <Button color="inherit" startIcon={<ExploreIcon />} onClick={() => navigate('/explore')}>
                   Explore
+                </Button>
+                <Button color="inherit" startIcon={<CalendarMonthIcon />} onClick={() => navigate('/meal-plan')}>
+                  Meal Plan
                 </Button>
               </>
             )}

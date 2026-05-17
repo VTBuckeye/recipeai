@@ -20,10 +20,12 @@ import {
   Share,
   Lock,
   Public,
-  Close
+  Close,
+  CalendarMonth
 } from '@mui/icons-material';
 import { Recipe } from '../../types';
 import { useNavigate } from 'react-router-dom';
+import AddToMealPlanModal from '../mealPlan/AddToMealPlanModal';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -41,6 +43,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isPrintMode, setIsPrintMode] = useState(false);
+  const [mealPlanModalOpen, setMealPlanModalOpen] = useState(false);
 
   const handlePrint = () => {
     setIsPrintMode(true);
@@ -87,6 +90,9 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
             Recipe Details
           </Typography>
           <Box display="flex" gap={1}>
+            <Button startIcon={<CalendarMonth />} onClick={() => setMealPlanModalOpen(true)} variant="contained">
+              Add to Meal Plan
+            </Button>
             <Button startIcon={<Print />} onClick={handlePrint} variant="outlined">
               Print
             </Button>
@@ -272,6 +278,14 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add to Meal Plan Modal */}
+      <AddToMealPlanModal
+        open={mealPlanModalOpen}
+        onClose={() => setMealPlanModalOpen(false)}
+        recipeId={recipe._id}
+        recipeTitle={recipe.title}
+      />
     </>
   );
 };

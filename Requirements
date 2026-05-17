@@ -91,3 +91,35 @@ The website should be viewable on mobile and desktop devices in a form factor th
 - First-time user welcome modal with site overview (content TBD)
 - Error handling via Material-UI Snackbar notifications
 - Loading states during OTP verification
+
+### Meal Planning Feature:
+- Users can create meal plans for multiple weeks (Sunday-Saturday)
+- Week navigation: previous week, next week, current week
+- Vertical layout grouped by day, then by meal type (Breakfast, Lunch, Dinner, Snack)
+- Add recipes to meal plan from recipe detail pages via "Add to Meal Plan" button
+- Modal interface for selecting week, day, meal type, and optional family member
+- Support for manual text entries (non-recipe items like "canned corn")
+- Family member management:
+  - Add, edit, and delete family members associated with user account
+  - Assign meals to specific family members or leave unassigned
+  - Family members stored in database and linked to user
+- Drag-and-drop functionality using @dnd-kit/core:
+  - Reorder meals between days and meal types
+  - Move meals between family members
+  - Visual feedback during drag operations
+- Meal plan data stored in MongoDB with three collections:
+  - FamilyMember: User's family members
+  - MealPlan: Weekly meal plan container (week start/end dates)
+  - MealPlanItem: Individual meal entries (recipe or manual text)
+- Accessible from top navigation bar and dashboard
+- Protected route requiring authentication
+- RESTful API endpoints:
+  - GET /api/meal-plans?weekStartDate - Get or create meal plan for a week
+  - POST /api/meal-plans/items - Add item to meal plan
+  - PUT /api/meal-plans/items/:id - Update meal plan item
+  - DELETE /api/meal-plans/items/:id - Delete meal plan item
+  - PUT /api/meal-plans/items/bulk - Bulk update for drag-and-drop
+  - GET /api/family-members - Get all family members
+  - POST /api/family-members - Create family member
+  - PUT /api/family-members/:id - Update family member
+  - DELETE /api/family-members/:id - Delete family member

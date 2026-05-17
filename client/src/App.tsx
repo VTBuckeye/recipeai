@@ -17,6 +17,7 @@ import { Profile } from './pages/Profile';
 import { MyRecipes } from './pages/MyRecipes';
 import { ExploreRecipes } from './pages/ExploreRecipes';
 import { RecipeDetailPage } from './pages/RecipeDetailPage';
+import MealPlan from './pages/MealPlan';
 import { SessionTimeoutWarning } from './components/SessionTimeoutWarning';
 import logger from './utils/logger';
 
@@ -88,6 +89,15 @@ const App: React.FC = () => {
                   element={
                     <SessionAuth>
                       <RecipeDetailPage />
+                    </SessionAuth>
+                  }
+                />
+
+                <Route
+                  path="/meal-plan"
+                  element={
+                    <SessionAuth>
+                      <MealPlan />
                     </SessionAuth>
                   }
                 />

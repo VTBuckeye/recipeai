@@ -14,6 +14,7 @@ import {
   LibraryBooks as LibraryBooksIcon,
   Explore as ExploreIcon,
   Person as PersonIcon,
+  CalendarMonth as CalendarMonthIcon,
 } from '@mui/icons-material';
 import WelcomeModal from '../components/WelcomeModal';
 import logger from '../utils/logger';
@@ -48,6 +49,13 @@ const Dashboard: React.FC = () => {
       icon: <ExploreIcon sx={{ fontSize: 48, color: 'primary.main' }} />,
       action: () => navigate('/explore'),
       buttonText: 'Explore',
+    },
+    {
+      title: 'Meal Plan',
+      description: 'Plan your meals for the week',
+      icon: <CalendarMonthIcon sx={{ fontSize: 48, color: 'primary.main' }} />,
+      action: () => navigate('/meal-plan'),
+      buttonText: 'View Meal Plan',
     },
     {
       title: 'My Profile',

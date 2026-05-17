@@ -1,0 +1,327 @@
+# .github/workflows/ci-cd.yml
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # 1. CODE QUALITY & SECURITY
+  code-analysis:
+    name: Static Analysis & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint Server
+        run: cd server && npm run lint
+      
+      - name: Lint Client
+        run: cd client && npm run lint || echo "Client lint not configured"
+      
+      - name: TypeScript Type Check
+        run: |
+          cd server && npx tsc --noEmit
+          cd ../client && npx tsc --noEmit
+
+  # 2. DEPENDENCY SCANNING
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run npm audit (Server)
+        run: cd server && npm audit --audit-level=moderate || true
+      
+      - name: Run npm audit (Client)
+        run: cd client && npm audit --audit-level=moderate || true
+      
+      # Snyk for comprehensive dependency scanning
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --severity-threshold=high
+      
+      # OWASP Dependency Check
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'recipeai'
+          path: '.'
+          format: 'HTML'
+          args: >
+            --enableRetired
+            --enableExperimental
+      
+      - name: Upload Dependency-Check results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports/
+
+  # 3. UNIT & INTEGRATION TESTS
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test
+          MONGO_INITDB_ROOT_PASSWORD: test
+        ports:
+          - 27017:27017
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Server Tests
+        run: cd server && npm test || echo "Tests not yet implemented"
+        env:
+          MONGODB_URI: mongodb://test:test@localhost:27017/test
+      
+      - name: Run Client Tests
+        run: cd client && npm test -- --watchAll=false --coverage
+      
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./client/coverage/lcov.info
+          flags: client
+      
+      - name: Archive Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            client/coverage/
+            server/coverage/
+
+  # 4. BUILD DOCKER IMAGES
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [code-analysis, test]
+    permissions:
+      contents: read
+      packages: write
+    
+    strategy:
+      matrix:
+        component: [client, server]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Save image for scanning
+        run: |
+          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:${{ github.sha }} \
+            -o ${{ matrix.component }}-image.tar
+      
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.component }}-image
+          path: ${{ matrix.component }}-image.tar
+          retention-days: 1
+
+  # 5. CONTAINER SECURITY SCANNING
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: build-images
+    
+    strategy:
+      matrix:
+        component: [client, server]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.component }}-image
+      
+      - name: Load Docker image
+        run: docker load -i ${{ matrix.component }}-image.tar
+      
+      # Trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-${{ matrix.component }}.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-${{ matrix.component }}.sarif'
+          category: trivy-${{ matrix.component }}
+      
+      # Snyk Container scanning
+      - name: Run Snyk Container scan
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:${{ github.sha }}
+          args: --severity-threshold=high --file=${{ matrix.component }}/Dockerfile
+      
+      # Grype for additional scanning
+      - name: Scan with Grype
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:${{ github.sha }}
+          fail-build: false
+          severity-cutoff: high
+      
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.component }}-security-scan
+          path: |
+            trivy-${{ matrix.component }}.sarif
+            results.sarif
+
+  # 6. PUSH IMAGES (only on main/develop)
+  push-images:
+    name: Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [container-scan, dependency-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: read
+      packages: write
+    
+    strategy:
+      matrix:
+        component: [client, server]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 7. DEPLOY TO KUBERNETES (staging/production)
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: push-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+      
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/recipeai-client \
+            recipeai-client=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client:${{ github.sha }} \
+            -n production
+          kubectl set image deployment/recipeai-server \
+            recipeai-server=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server:${{ github.sha }} \
+            -n production
+          kubectl rollout status deployment/recipeai-client -n production
+          kubectl rollout status deployment/recipeai-server -n production

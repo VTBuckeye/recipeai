@@ -11,6 +11,7 @@ import { connectDatabase } from './config/database';
 import { initSuperTokens } from './config/supertokens';
 import routes from './routes';
 import metricsRoutes from './routes/metricsRoutes';
+import clientLogsRoutes from './routes/clientLogsRoutes';
 import {
   requestLogger,
   errorLogger,
@@ -60,6 +61,11 @@ app.use(sessionLogger);
 
 // Metrics endpoint (before rate limiting and auth)
 app.use('/metrics', metricsRoutes);
+
+// Client log shipping endpoint (outside /api so it bypasses the global rate limiter;
+// has its own dedicated rate limit and is intentionally unauthenticated so errors
+// during the auth flow still reach Loki).
+app.use('/client-logs', clientLogsRoutes);
 
 // SuperTokens middleware
 app.use(supertokensMiddleware());
